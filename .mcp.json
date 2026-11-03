@@ -1,0 +1,17 @@
+{
+	"mcpServers": {
+		"my-local-mcp-server": {
+			"type": "stdio",
+			"command": "node",
+			"args": [
+				"./MCP-server/dist/index.js"
+			],
+			"dev": {
+				"watch": "MCP-server/dist/**/*.js",
+				"debug": {
+					"type": "node"
+				}
+			}
+		}
+	}
+}
