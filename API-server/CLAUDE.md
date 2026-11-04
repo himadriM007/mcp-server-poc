@@ -58,6 +58,16 @@ Feature modules live under `src/modules/<feature>/`, imported into `src/app/app.
   - `fn_remove_user` is a soft delete (`is_active = FALSE`) and returns only `name` and `email`, so `UserService.remove` adds `id` back from the DTO. A missing or already inactive user returns a generic `Error #<id>: <name>` message with `code: 0`.
 - `src/main.ts` registers a global `ValidationPipe({ whitelist: true, transform: true })` (required for the `class-validator`/`class-transformer` decorators above to actually run and for query-string values to coerce to numbers) and sets up `@nestjs/swagger` (`DocumentBuilder` + `SwaggerModule.setup('api', ...)`) — Swagger UI is served at `/api` and the OpenAPI JSON at `/api-json` when the app is running. Swagger reads classes, not interfaces, so `UserResponseDto` and `UserDto` in `user.dto.ts` mirror the `UserResponse` interface for the docs. New endpoints should have `@ApiOperation` and a typed response decorator.
 
+### Chat module
+
+`src/modules/chat/` (routed at `/chat`) is a Gemini chatbot whose tools come from `../MCP-server` (which in turn calls this API's `/users`). The React UI in `../MCP-client` is its only client.
+- Routes: `GET /chat/info`, `POST /chat` (`ChatMessageDto`), `POST /chat/confirm` (`ConfirmToolDto`), `POST /chat/reset` (`ResetChatDto`); POSTs return 200 via `@HttpCode`.
+- `ChatService` connects lazily on the first request: it spawns `MCP_SERVER_PATH` (default `../MCP-server/dist/index.js`, resolved from `process.cwd()`) over stdio with `API_BASE_URL` (default `http://localhost:$PORT`). The app therefore still starts without a key; chat requests then return 503. A failed or closed connection is retried on the next request.
+- `main.ts` enables CORS for the UI's origins: `CORS_ORIGINS` (comma-separated, default `http://localhost:5173,http://localhost:4173`).
+- Config in `.env.dev`: `GEMINI_API_KEY` (required for chat), `GEMINI_MODEL` (required, no built-in default; read once on first connect, so restart after changing it), optional `MCP_SERVER_PATH` / `API_BASE_URL`.
+- Conversations are kept in memory per client `sessionId` (max 200, oldest evicted). Tools with `destructiveHint` pause the turn and return `confirm`; the client resumes with `/chat/confirm`. A failed turn is rolled back out of the history. Gemini errors map to 502, a pending/busy session to 409.
+- `@google/genai` and `@modelcontextprotocol/sdk` both ship CommonJS builds, so they import normally here. Specs `jest.mock` both SDKs; nothing hits Gemini or spawns the MCP server.
+
 ## Database (PostgreSQL)
 
 - `src/services/db/db.service.ts` — `DbService` wraps a `pg` `Pool`. Exposes `query(text, params)` for parameterized queries and `testConnection()` which runs `SELECT 1` and throws on failure. Pool is closed in `onModuleDestroy`.
