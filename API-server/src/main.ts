@@ -6,6 +6,17 @@ import { AppModule } from './app/app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Allow the React chat UI (MCP-client) to call this API from the browser.
+  // CORS_ORIGINS is a comma-separated list; defaults cover Vite dev and preview.
+  app.enableCors({
+    origin: (
+      process.env.CORS_ORIGINS ?? 'http://localhost:5173,http://localhost:4173'
+    )
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
